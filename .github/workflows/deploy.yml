@@ -1,0 +1,57 @@
+name: Deploy Full Stack Application
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Backend Dependencies
+        working-directory: demo_be_v1
+        run: npm ci
+
+      - name: Install Frontend Dependencies
+        working-directory: demo_fe_v1
+        run: npm ci
+
+      - name: Build Frontend
+        working-directory: demo_fe_v1
+        run: npm run build
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/applications/demo-project
+
+            git fetch origin
+            git reset --hard origin/master
+
+            cd demo_be_v1
+            npm ci
+
+            cd ../demo_fe_v1
+            npm ci
+            npm run build
+
+            pm2 restart demo-backend
+            pm2 restart demo-frontend
+
+            pm2 save
+
+            sudo systemctl reload nginx
