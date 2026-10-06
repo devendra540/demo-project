@@ -40,6 +40,7 @@ pipeline {
         stage('Deploy to App EC2') {
             steps {
                 script {
+
                     def commitId = sh(
                         script: 'git rev-parse HEAD',
                         returnStdout: true
@@ -53,7 +54,7 @@ pipeline {
                               --region ${AWS_REGION} \
                               --instance-ids ${APP_INSTANCE_ID} \
                               --document-name AWS-RunShellScript \
-                              --parameters '{"commands":["export HOME=/root","cd /var/www/demo-project","git config --global --add safe.directory /var/www/demo-project","git fetch origin master","git reset --hard ${commitId}","cd demo_fe_v1","npm ci","npm run build","cd ../demo_be_v1","npm ci","pm2 restart demo-backend --update-env","nginx -t","systemctl reload nginx","echo DEPLOYMENT_SUCCESS"]}' \
+                              --parameters '{"commands":["export HOME=/root","cd /var/www/demo-project","git config --global --add safe.directory /var/www/demo-project","git fetch origin master","git reset --hard ${commitId}","cd demo_fe_v1","npm ci","npm run build","cd ../demo_be_v1","npm ci","if pm2 describe demo-backend >/dev/null 2>&1; then pm2 restart demo-backend --update-env; else pm2 start server.js --name demo-backend; fi","pm2 save","nginx -t","systemctl reload nginx","pm2 status","echo DEPLOYMENT_SUCCESS"]}' \
                               --query 'Command.CommandId' \
                               --output text
                         """,
@@ -79,7 +80,7 @@ pipeline {
                     echo "Deployment result:"
                     echo result
 
-                    if (!result.startsWith('Success')) {
+                    if (!result.contains('DEPLOYMENT_SUCCESS')) {
                         error("Deployment failed")
                     }
                 }
